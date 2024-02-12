@@ -1,13 +1,13 @@
-/*
------------------------------------------------------------------------------------------------------------------
-|                                                                                                                |
-|                             Manoper - Matriz Switcher edition for WT32-SC01                              |
-|                                                                                                                |
------------------------------------------------------------------------------------------------------------------
-*/
+
+#define AUTO_SLEEP false
+#define AUTO_SLEEP_TIME 3000    // 3 seconds
+#define DELAY_TOUCH 300    // 300 miliseconds
+#define COLOR_ON TFT_DARKGREEN
+#define COLOR_OFF TFT_BLACK
+#define ledBrightness 20
+//--------------------------------------------------------------------------------------- VOID INIC
 
 #include <TFT_eSPI.h>
-#include <LittleFS.h>
 #include <FS.h>
 #include <EEPROM.h>
 #include <SPI.h>
@@ -22,10 +22,6 @@
 #include <FT6236.h>
 FT6236 ts = FT6236();
 #endif
-
-#define FILESYSTEM LittleFS
-
-#define REPEAT_CAL false
 
 #define KEY_W 95
 #define KEY_H 95
@@ -44,44 +40,52 @@ TFT_eSPI_Button key[12];
 
 RTC_DATA_ATTR uint16_t valor[12];
 int address = 0;
-uint16_t lcd_sleep = 0, display_state = 0;
 
+uint8_t inic = 0, display_state = 0;
+uint16_t lcd_sleep = 0;
 
-void salvarNaEEPROM() {
-  for (int i = 0; i < 12; i++) {
-    EEPROM.put(i * sizeof(int), valor[i]);
-  }
-  EEPROM.commit(); // Salvar as alterações na EEPROM
-}
+void matriz();
+void switch_color(int button);
+void buttonpress(int button);
+void lcd();
+void salvarNaEEPROM();
+void lerDaEEPROM();
 
-void lerDaEEPROM() {
-  for (int i = 0; i < 12; i++) {
-    EEPROM.get(i * sizeof(int), valor[i]);
-  }
-}
+//--------------------------------------------------------------------------------------- VOID SETUP
 
 void setup() {
-
+  
   Serial.begin(115200);
   EEPROM.begin(512);
+  
+  Serial.println("---------------------------------------------");
+  Serial.println("|     Manoper - Matriz Switcher edition     |");
+  Serial.println("---------------------------------------------");
+  Serial.println("Serial begun.");
+  
   lerDaEEPROM();
 
   for (int i = 0; i < 12; i++) {
     
-    if (valor[i] != 1) {
+    if (valor[i] == 1 || valor[i] == 2) {
+      Serial.print(i+1);
+      Serial.println(" = ok");
+    } else {
       valor[i] = 2;
-      Serial.print(i);
+      salvarNaEEPROM();
+      Serial.print(i+1);
       Serial.println(" = saved");
     }
 
     if (valor[i] == 2) {
-      keyColor[i] = TFT_RED;
+      keyColor[i] = COLOR_OFF;
     } else {
-      keyColor[i] = TFT_GREEN;
+      keyColor[i] = COLOR_ON;
     }
+
+    buttonpress(i);
   }
   
-  salvarNaEEPROM();
 
 #ifdef ENABLE_CAP_TOUCH
   if (ts.begin(40, CUSTOM_TOUCH_SDA, CUSTOM_TOUCH_SCL)) {
@@ -92,10 +96,11 @@ void setup() {
 #endif
 
   lcd();
-
-  tabela();
+  matriz();
+  inic = 1;
 }
 
+//--------------------------------------------------------------------------------------- VOID LOOP
 
 void loop() {
 
@@ -112,17 +117,18 @@ void loop() {
       lcd_sleep = 0;
       ledcAttachPin(TFT_BL, 0);
       Serial.println("Screen ON");
-      delay(300);
+      delay(DELAY_TOUCH);
     } else {
       pressed = true;
+      lcd_sleep = 0;
     }
   } else {
-    if(lcd_sleep <= 3000){
+    if(lcd_sleep <= AUTO_SLEEP_TIME && AUTO_SLEEP){
       lcd_sleep++;
       Serial.println("LCD Sleeper count = ");
       Serial.println(lcd_sleep);
     }
-    if(lcd_sleep == 3000){
+    if(lcd_sleep == AUTO_SLEEP_TIME){
       display_state = 1;
       ledcAttachPin(TFT_BL, 1);
       Serial.println("Screen OFF");
@@ -132,50 +138,55 @@ void loop() {
   for (uint8_t b = 0; b < 12; b++) {
     if (pressed && key[b].contains(t_x, t_y)) {
       buttonpress(b);
-      delay(300);
+      delay(DELAY_TOUCH);
       pressed = false;
     }
   }
 }
 
+//--------------------------------------------------------------------------------------- VOID MATRIZ
 
-void tabela() {
+void matriz(){
+  
   for (uint8_t row = 0; row < 3; row++) {
     for (uint8_t col = 0; col < 4; col++) {
 
       uint8_t b = col + row * 4;
 
-      key[b].initButton(&tft, KEY_X + col * (KEY_W + KEY_SPACING_X),
-                        KEY_Y + row * (KEY_H + KEY_SPACING_Y), KEY_W, KEY_H, TFT_WHITE, keyColor[b], TFT_WHITE,
-                        keyLabel[b], KEY_TEXTSIZE);
+      key[b].initButton(&tft, KEY_X + col * (KEY_W + KEY_SPACING_X), KEY_Y + row * (KEY_H + KEY_SPACING_Y), KEY_W, KEY_H, TFT_WHITE, keyColor[b], TFT_WHITE, keyLabel[b], KEY_TEXTSIZE);
       key[b].drawButton();
     }
   }
 }
 
+//--------------------------------------------------------------------------------------- VOID SWITCH COLOR
 
-void switch_color(int button) {
+void switch_color(int button){
+  
   if(valor[button] == 1){
-    keyColor[button] = TFT_RED;
+    keyColor[button] = COLOR_OFF;
     valor[button] = 2;
   } else if(valor[button] == 2){
-    keyColor[button] = TFT_GREEN;
+    keyColor[button] = COLOR_ON;
     valor[button] = 1;
   }
 
   salvarNaEEPROM();
 
-  tabela();
+  matriz();
 }
 
+//--------------------------------------------------------------------------------------- VOID BUTTON PRESS
 
 void buttonpress(int button){
+  
+  if(inic == 1) switch_color(button);
 
-  switch_color(button);
+  Serial.print(button+1);
+  Serial.print(" pressed = ");
 
   switch(button){
     case 0:
-     Serial.print("Button 1 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -184,7 +195,6 @@ void buttonpress(int button){
 
      break;
     case 1:
-     Serial.print("Button 2 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -193,7 +203,6 @@ void buttonpress(int button){
      
      break;
     case 2:
-     Serial.print("Button 3 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -202,7 +211,6 @@ void buttonpress(int button){
 
      break;
     case 3:
-     Serial.print("Button 4 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -211,7 +219,6 @@ void buttonpress(int button){
 
      break;
     case 4:
-     Serial.print("Button 5 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -220,7 +227,6 @@ void buttonpress(int button){
 
      break;
     case 5:
-     Serial.print("Button 6 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -229,7 +235,6 @@ void buttonpress(int button){
      
      break;
     case 6:
-     Serial.print("Button 7 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -238,7 +243,6 @@ void buttonpress(int button){
      
      break;
     case 7:
-     Serial.print("Button 8 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -247,7 +251,6 @@ void buttonpress(int button){
 
      break;
     case 8:
-     Serial.print("Button 9 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -256,7 +259,6 @@ void buttonpress(int button){
 
      break;
     case 9:
-     Serial.print("Button 10 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -265,7 +267,6 @@ void buttonpress(int button){
 
      break;
     case 10:
-     Serial.print("Button 11 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -274,7 +275,6 @@ void buttonpress(int button){
 
      break;
     case 11:
-     Serial.print("Button 12 pressed = ");
      if(valor[button] == 2){
       Serial.println("OFF");
      } else {
@@ -296,11 +296,28 @@ void lcd(){
 #else
   ledcAttachPin(backlightPin, 1);
 #endif
-  ledcWrite(0, 20);
+  ledcWrite(0, ledBrightness);
 
   tft.init();
   tft.setRotation(1);
   tft.fillScreen(TFT_BLACK);
 
   ledcAttachPin(TFT_BL, 0);
+}
+
+//--------------------------------------------------------------------------------------- VOIDs EEPROM
+
+void salvarNaEEPROM(){
+  
+  for(int i = 0; i < 12; i++){
+    EEPROM.put(i * sizeof(int), valor[i]);
+  }
+  EEPROM.commit();
+}
+
+void lerDaEEPROM(){
+  
+  for(int i = 0; i < 12; i++){
+    EEPROM.get(i * sizeof(int), valor[i]);
+  }
 }

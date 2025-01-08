@@ -4,7 +4,7 @@ This project is designed for the WT32-SC01 hardware and provides a matrix switch
 
 ---
 
-## **Project Objective**
+## 🌟 **Project Objective**
 The aim of this project is to create a dynamic interface using the WT32-SC01 for managing multiple buttons in a matrix layout. Key objectives include:
 
 - Implementation of a capacitive touch system.
@@ -13,7 +13,7 @@ The aim of this project is to create a dynamic interface using the WT32-SC01 for
 
 ---
 
-## **Structure Overview**
+## 📂 **Structure Overview**
 ### **Settings**
 Key project settings include:
 - **AUTO_SLEEP**: Enables or disables automatic sleep mode.

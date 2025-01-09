@@ -1,4 +1,4 @@
-# WT32-SC01: Matriz Switcher Edition
+# 🔥 WT32-SC01: Matriz Switcher Edition
 
 This project is designed for the WT32-SC01 hardware and provides a matrix switcher system for managing button states using a touch-enabled display. It includes features such as EEPROM storage, touch control, and customizable button states.
 
